@@ -8,9 +8,9 @@ const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'
 function createWindow() {
   const win = new BrowserWindow({
     width: 1040,
-    height: 680,
-    minWidth: 940,
-    minHeight: 620,
+    height: 720,
+    minWidth: 920,
+    minHeight: 640,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -21,8 +21,6 @@ function createWindow() {
 
   if (isDev) {
     win.loadURL('http://localhost:5173')
-    // Open DevTools in dev mode
-    win.webContents.openDevTools()
   } else {
     win.loadFile(path.join(__dirname, 'dist-react', 'index.html'))
   }
@@ -59,7 +57,7 @@ ipcMain.handle('get-default-download-dir', () => {
 
 ipcMain.handle('has-ffmpeg', async () => {
   return new Promise((resolve) => {
-    exec('python -c "import sys; sys.path.insert(0, \'src\'); from yt_downloader.downloader import has_ffmpeg; print(has_ffmpeg())"', (err, stdout) => {
+    exec('python -c "import sys; sys.path.insert(0, \'src\'); from yt_downloader.downloader import has_ffmpeg; print(has_ffmpeg())"', { cwd: __dirname }, (err, stdout) => {
       if (err) return resolve(false)
       resolve(stdout.trim() === 'True')
     })
@@ -68,7 +66,8 @@ ipcMain.handle('has-ffmpeg', async () => {
 
 ipcMain.handle('fetch-info', async (event, url) => {
   return new Promise((resolve) => {
-    const child = spawn(pythonCmd, ['bridge.py', 'info', url])
+    const bridgeScript = path.join(__dirname, 'bridge.py')
+    const child = spawn(pythonCmd, [bridgeScript, 'info', url], { cwd: __dirname })
     let output = ''
     let errorOutput = ''
 
@@ -101,7 +100,8 @@ ipcMain.handle('fetch-info', async (event, url) => {
 })
 
 ipcMain.on('start-download', (event, { url, mediaType, quality, audioFormat, outputDir }) => {
-  const child = spawn(pythonCmd, ['bridge.py', 'download', url, mediaType, quality, audioFormat, outputDir])
+  const bridgeScript = path.join(__dirname, 'bridge.py')
+  const child = spawn(pythonCmd, [bridgeScript, 'download', url, mediaType, quality, audioFormat, outputDir], { cwd: __dirname })
 
   child.stdout.on('data', (data) => {
     const lines = data.toString().split('\n')
@@ -119,13 +119,13 @@ ipcMain.on('start-download', (event, { url, mediaType, quality, audioFormat, out
           event.reply('download-error', parsed.error)
         }
       } catch {
-        // Log line if not JSON
+        // Non-json stdout line
       }
     }
   })
 
   child.stderr.on('data', (data) => {
-    // Standard error stream
+    // Stderr output
   })
 
   child.on('close', (code) => {

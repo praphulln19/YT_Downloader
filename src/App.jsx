@@ -31,23 +31,23 @@ export default function App() {
         setProgress(data.percent || 0)
         setSpeed(data.speed || '')
         setEta(data.eta || '')
-        setStatusMessage(`Downloading... ${data.percent ? data.percent.toFixed(1) + '%' : ''}`)
+        setStatusMessage(`Downloading stream... ${data.percent ? data.percent.toFixed(1) + '%' : ''}`)
       })
 
       window.api.onDownloadProcessing(() => {
         setDownloadStatus('processing')
-        setStatusMessage('Processing and merging streams (FFmpeg)...')
+        setStatusMessage('Merging audio & video streams with FFmpeg...')
       })
 
       window.api.onDownloadDone((data) => {
         setDownloadStatus('done')
         setProgress(100)
-        setStatusMessage(`Download complete! Saved to: ${data.dest}`)
+        setStatusMessage(`Download complete. File saved to: ${data.dest}`)
       })
 
       window.api.onDownloadError((err) => {
         setDownloadStatus('error')
-        setStatusMessage(`Failed: ${err}`)
+        setStatusMessage(`Error encountered: ${err}`)
       })
     }
   }, [])
@@ -58,7 +58,7 @@ export default function App() {
     if (!cleanUrl) return
 
     setIsFetching(true)
-    setVideoTitle('Analyzing video metadata...')
+    setVideoTitle('Fetching media metadata...')
     setAvailableHeights([])
     setDownloadStatus(null)
 
@@ -91,12 +91,12 @@ export default function App() {
   const handleDownload = () => {
     const cleanUrl = url.trim()
     if (!cleanUrl) {
-      alert('Please enter a YouTube link first.')
+      alert('Please enter a YouTube URL first.')
       return
     }
 
     if (cleanUrl !== fetchedUrl) {
-      alert('The URL has changed. Please click "Fetch Info" first to load available qualities.')
+      alert('The URL has changed. Please click "Fetch Details" first.')
       return
     }
 
@@ -104,7 +104,7 @@ export default function App() {
     setProgress(0)
     setSpeed('')
     setEta('')
-    setStatusMessage('Starting download...')
+    setStatusMessage('Initializing download worker...')
 
     window.api.startDownload({
       url: cleanUrl,
@@ -121,210 +121,179 @@ export default function App() {
     }
   }
 
-  const handlePaste = async () => {
-    try {
-      const text = await navigator.clipboard.readText()
-      if (text) {
-        setUrl(text)
-      }
-    } catch (err) {
-      // Ignore fallback
-    }
-  }
-
   return (
     <div className="app-container">
-      {/* Glow Backdrop Lights */}
-      <div className="glow-light glow-1"></div>
-      <div className="glow-light glow-2"></div>
-
       <header>
         <div className="logo-container">
-          <div className="logo-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="7 10 12 15 17 10"></polyline>
-              <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-          </div>
+          <div className="logo-badge">↓</div>
           <div>
             <h1>YT Downloader</h1>
-            <p className="subtitle">Modern High-Quality Media Utility</p>
+            <p className="subtitle">Standalone Media Engine</p>
           </div>
         </div>
+
         <div>
           {hasFfmpeg ? (
-            <span className="ffmpeg-badge">
-              <span className="dot"></span> Bundled FFmpeg Ready
-            </span>
+            <div className="status-pill">
+              <span className="pulse-dot">
+                <span className="pulse-ping"></span>
+                <span className="pulse-core"></span>
+              </span>
+              <span>FFmpeg Available</span>
+            </div>
           ) : (
-            <span className="ffmpeg-badge missing">
-              <span className="dot"></span> System Mode (360p max)
-            </span>
+            <div className="status-pill missing">
+              <span className="pulse-dot">
+                <span className="pulse-ping"></span>
+                <span className="pulse-core"></span>
+              </span>
+              <span>FFmpeg Missing (360p Max)</span>
+            </div>
           )}
         </div>
       </header>
 
       <main className="dashboard-card">
-        {/* Main URL Bar */}
-        <div className="input-section">
-          <div className="section-header">
-            <label htmlFor="url-input">YouTube Link</label>
-            <button className="btn-link" onClick={handlePaste} type="button">
-              Paste from Clipboard
-            </button>
-          </div>
-          <div className="url-input-container">
+        {/* URL Input Section */}
+        <div className="input-group">
+          <div className="section-title">01. Media URL</div>
+          <div className="input-row">
             <input
-              id="url-input"
               type="text"
               className="text-input"
-              placeholder="Paste video or playlist link here..."
+              placeholder="https://www.youtube.com/watch?v=..."
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={handleUrlKeyDown}
               disabled={isFetching || downloadStatus === 'downloading' || downloadStatus === 'processing'}
             />
             <button
-              className="btn btn-secondary"
+              className="btn btn-black"
               onClick={handleFetchInfo}
               disabled={!url.trim() || isFetching || downloadStatus === 'downloading' || downloadStatus === 'processing'}
             >
-              {isFetching ? (
-                <>
-                  <span className="spinner"></span> Fetching...
-                </>
-              ) : (
-                'Fetch Info'
-              )}
+              {isFetching ? 'Fetching...' : 'Fetch Details'}
             </button>
           </div>
         </div>
 
         {/* Video Preview Card */}
         {videoTitle && (
-          <div className="video-info-box">
-            <div className="video-info-header">
-              <span className="badge-tag">READY</span>
-              <span className="video-info-label">Detected Media Title</span>
-            </div>
-            <div className="video-title">{videoTitle}</div>
+          <div className="video-preview-card">
+            <div className="video-preview-meta">YTD_STREAM_METADATA :: READY</div>
+            <div className="video-preview-title">{videoTitle}</div>
           </div>
         )}
 
-        {/* Media Type Tabs */}
-        <div className="option-group">
-          <label>Format Type</label>
-          <div className="mode-switches">
+        {/* Format & Mode Selection */}
+        <div className="input-group">
+          <div className="section-title">02. Media Type</div>
+          <div className="mode-grid">
             <div
-              className={`mode-card ${mediaType === 'video' ? 'active' : ''}`}
+              className={`mode-item ${mediaType === 'video' ? 'active' : ''}`}
               onClick={() => {
                 if (downloadStatus !== 'downloading' && downloadStatus !== 'processing') {
                   setMediaType('video')
                 }
               }}
             >
-              <div className="mode-icon">🎬</div>
-              <div>
-                <div className="mode-label">Video & Audio</div>
-                <div className="mode-desc">High resolution MP4 video</div>
-              </div>
+              <div className="mode-title">Video & Audio</div>
+              <div className="mode-desc">High-definition video (MP4)</div>
             </div>
+
             <div
-              className={`mode-card ${mediaType === 'audio' ? 'active' : ''}`}
+              className={`mode-item ${mediaType === 'audio' ? 'active' : ''}`}
               onClick={() => {
                 if (downloadStatus !== 'downloading' && downloadStatus !== 'processing') {
                   setMediaType('audio')
                 }
               }}
             >
-              <div className="mode-icon">🎵</div>
-              <div>
-                <div className="mode-label">Audio Only</div>
-                <div className="mode-desc">Extract MP3, M4A, or Opus</div>
-              </div>
+              <div className="mode-title">Audio Only</div>
+              <div className="mode-desc">Audio stream (MP3, M4A, Opus)</div>
             </div>
           </div>
         </div>
 
-        {/* Quality / Audio Format Grid */}
-        <div className="option-group">
-          <label>{mediaType === 'video' ? 'Video Quality Selection' : 'Audio Format Selection'}</label>
-          
+        {/* Quality Chips Selection */}
+        <div className="input-group">
+          <div className="section-title">
+            {mediaType === 'video' ? '03. Preferred Quality' : '03. Audio Format'}
+          </div>
+
           {mediaType === 'video' ? (
-            <div className="quality-grid">
+            <div className="chip-grid">
               <button
                 type="button"
-                className={`quality-chip ${quality === 'best' ? 'active' : ''}`}
+                className={`chip-item ${quality === 'best' ? 'active' : ''}`}
                 onClick={() => setQuality('best')}
                 disabled={downloadStatus === 'downloading' || downloadStatus === 'processing'}
               >
-                <span className="chip-title">Best Available</span>
-                <span className="chip-sub">Highest Quality</span>
+                <span className="chip-main">Best</span>
+                <span className="chip-sub">Max Quality</span>
               </button>
 
               {availableHeights.map((h) => (
                 <button
                   type="button"
                   key={h}
-                  className={`quality-chip ${quality === String(h) ? 'active' : ''}`}
+                  className={`chip-item ${quality === String(h) ? 'active' : ''}`}
                   onClick={() => setQuality(String(h))}
                   disabled={downloadStatus === 'downloading' || downloadStatus === 'processing'}
                 >
-                  <span className="chip-title">{h}p</span>
-                  <span className="chip-sub">{h >= 1080 ? 'Full HD' : h >= 720 ? 'HD' : 'Standard'}</span>
+                  <span className="chip-main">{h}p</span>
+                  <span className="chip-sub">{h >= 1080 ? 'Full HD' : h >= 720 ? 'HD' : 'SD'}</span>
                 </button>
               ))}
 
               <button
                 type="button"
-                className={`quality-chip ${quality === 'small' ? 'active' : ''}`}
+                className={`chip-item ${quality === 'small' ? 'active' : ''}`}
                 onClick={() => setQuality('small')}
                 disabled={downloadStatus === 'downloading' || downloadStatus === 'processing'}
               >
-                <span className="chip-title">Smallest</span>
-                <span className="chip-sub">Compact File</span>
+                <span className="chip-main">Small</span>
+                <span className="chip-sub">Compact</span>
               </button>
             </div>
           ) : (
-            <div className="quality-grid">
+            <div className="chip-grid">
               <button
                 type="button"
-                className={`quality-chip ${audioFormat === 'mp3' ? 'active' : ''}`}
+                className={`chip-item ${audioFormat === 'mp3' ? 'active' : ''}`}
                 onClick={() => setAudioFormat('mp3')}
                 disabled={!hasFfmpeg || downloadStatus === 'downloading' || downloadStatus === 'processing'}
               >
-                <span className="chip-title">MP3</span>
-                <span className="chip-sub">Universal Audio</span>
+                <span className="chip-main">MP3</span>
+                <span className="chip-sub">Universal</span>
               </button>
               <button
                 type="button"
-                className={`quality-chip ${audioFormat === 'original' ? 'active' : ''}`}
+                className={`chip-item ${audioFormat === 'original' ? 'active' : ''}`}
                 onClick={() => setAudioFormat('original')}
                 disabled={downloadStatus === 'downloading' || downloadStatus === 'processing'}
               >
-                <span className="chip-title">M4A / Original</span>
-                <span className="chip-sub">Native Stream</span>
+                <span className="chip-main">M4A</span>
+                <span className="chip-sub">Original</span>
               </button>
               <button
                 type="button"
-                className={`quality-chip ${audioFormat === 'opus' ? 'active' : ''}`}
+                className={`chip-item ${audioFormat === 'opus' ? 'active' : ''}`}
                 onClick={() => setAudioFormat('opus')}
                 disabled={!hasFfmpeg || downloadStatus === 'downloading' || downloadStatus === 'processing'}
               >
-                <span className="chip-title">Opus</span>
+                <span className="chip-main">Opus</span>
                 <span className="chip-sub">High Efficiency</span>
               </button>
             </div>
           )}
         </div>
 
-        {/* Directory Picker */}
-        <div className="input-section">
-          <label htmlFor="dir-input">Destination Folder</label>
-          <div className="url-input-container">
+        {/* Destination Path */}
+        <div className="input-group">
+          <div className="section-title">04. Save Location</div>
+          <div className="input-row">
             <input
-              id="dir-input"
               type="text"
               className="text-input"
               value={outputDir}
@@ -332,7 +301,7 @@ export default function App() {
               disabled={downloadStatus === 'downloading' || downloadStatus === 'processing'}
             />
             <button
-              className="btn btn-secondary"
+              className="btn btn-outline"
               onClick={handleBrowse}
               disabled={downloadStatus === 'downloading' || downloadStatus === 'processing'}
             >
@@ -342,9 +311,10 @@ export default function App() {
         </div>
 
         {/* Action Button */}
-        <div className="action-row">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
           <button
-            className="btn btn-primary btn-large"
+            className="btn btn-black"
+            style={{ padding: '14px 32px', fontSize: '15px' }}
             onClick={handleDownload}
             disabled={!fetchedUrl || downloadStatus === 'downloading' || downloadStatus === 'processing'}
           >
@@ -352,27 +322,40 @@ export default function App() {
           </button>
         </div>
 
-        {/* Progress & Toast Notification */}
+        {/* Terminal Widget Output Console */}
         {downloadStatus && (
-          <div className={`status-area ${downloadStatus}`}>
-            <div className="status-header">
-              <span className="status-text">{statusMessage}</span>
-              {downloadStatus === 'downloading' && (
-                <span className="status-stats">
-                  {speed && `${speed}`} {eta && ` • ETA ${eta}`}
-                </span>
-              )}
+          <div className="terminal-widget">
+            <div className="terminal-header">
+              <div className="terminal-dots">
+                <div className="terminal-dot"></div>
+                <div className="terminal-dot"></div>
+                <div className="terminal-dot"></div>
+              </div>
+              <div className="terminal-path">session@yt-downloader:~</div>
             </div>
-            
-            <div className={`progress-track ${downloadStatus === 'processing' ? 'indeterminate' : ''}`}>
-              <div
-                className="progress-fill"
-                style={{ width: `${progress}%` }}
-              ></div>
+            <div className="terminal-body">
+              <div>
+                <span className="terminal-prompt">➜</span>
+                <span>{statusMessage}</span>
+              </div>
+              {downloadStatus === 'downloading' && (
+                <div>
+                  <span className="terminal-prompt">➜</span>
+                  <span>{speed && `Speed: ${speed}`} {eta && `• ETA: ${eta}`}</span>
+                </div>
+              )}
+              <div className={`progress-bar-bg ${downloadStatus === 'processing' ? 'indeterminate' : ''}`}>
+                <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
+              </div>
             </div>
           </div>
         )}
       </main>
+
+      <footer>
+        <span>YT Downloader v1.0.3</span>
+        <span>Built with Electron & React</span>
+      </footer>
     </div>
   )
 }
