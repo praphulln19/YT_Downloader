@@ -6,7 +6,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from .downloader import DownloaderError, download, has_ffmpeg
+from .downloader import DownloaderError, download, has_ffmpeg, fetch_video_info
 from .paths import default_download_dir, resolve_output_dir
 
 
@@ -52,9 +52,16 @@ class DownloaderApp(tk.Tk):
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.worker: threading.Thread | None = None
 
+        self.fetched_url = ""
+        self.fetched_qualities = {
+            "Best available": "best",
+            "Smallest file": "small"
+        }
+
         self.url_var = tk.StringVar()
+        self.video_title_var = tk.StringVar(value="")
         self.media_type_var = tk.StringVar(value="video")
-        self.quality_var = tk.StringVar(value="Best available")
+        self.quality_var = tk.StringVar(value="Fetch info first")
         self.audio_format_var = tk.StringVar(value="Original")
         self.output_dir_var = tk.StringVar(value=str(default_download_dir()))
         self.status_var = tk.StringVar(value=self._initial_status())
@@ -157,8 +164,9 @@ class DownloaderApp(tk.Tk):
         url_card = self._card(main)
         url_card.grid(row=2, column=0, sticky="ew", pady=(0, 16))
         url_card.columnconfigure(0, weight=1)
+        url_card.columnconfigure(1, weight=0)
         ttk.Label(url_card, text="YouTube URL", style="Card.TLabel", font=("Inter", 10, "bold")).grid(
-            row=0, column=0, sticky="w"
+            row=0, column=0, columnspan=2, sticky="w"
         )
         self.url_entry = tk.Entry(
             url_card,
@@ -174,7 +182,19 @@ class DownloaderApp(tk.Tk):
             highlightcolor=colors["primary"],
         )
         self.url_entry.grid(row=1, column=0, sticky="ew", pady=(8, 0), ipady=8)
+        self.url_entry.bind("<Return>", lambda event: self._fetch_video_details())
         self.url_entry.focus()
+
+        self.fetch_button = self._secondary_button(url_card, "Fetch Info", self._fetch_video_details)
+        self.fetch_button.grid(row=1, column=1, sticky="e", pady=(8, 0), padx=(12, 0))
+
+        self.video_title_label = ttk.Label(
+            url_card,
+            textvariable=self.video_title_var,
+            style="Muted.TLabel",
+            font=("Inter Italic", 10)
+        )
+        self.video_title_label.grid(row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
 
         settings_grid = ttk.Frame(main, style="Main.TFrame")
         settings_grid.grid(row=3, column=0, sticky="ew", pady=(0, 16))
@@ -198,7 +218,7 @@ class DownloaderApp(tk.Tk):
         self.quality_combo = ttk.Combobox(
             mode_card,
             textvariable=self.quality_var,
-            values=list(VIDEO_QUALITIES),
+            values=["Fetch info first"],
             state="readonly",
             font=("Inter", 10),
         )
@@ -427,6 +447,14 @@ class DownloaderApp(tk.Tk):
             messagebox.showwarning("Missing URL", "Paste a YouTube URL first.")
             return
 
+        if url != self.fetched_url:
+            messagebox.showwarning(
+                "Fetch Details First",
+                "The URL has changed or video details haven't been fetched yet. "
+                "Please click 'Fetch Info' first to load the available qualities for this video."
+            )
+            return
+
         try:
             output_dir = resolve_output_dir(self.output_dir_var.get())
         except OSError as exc:
@@ -434,12 +462,15 @@ class DownloaderApp(tk.Tk):
             return
 
         media_type = self.media_type_var.get()
-        quality = VIDEO_QUALITIES[self.quality_var.get()]
+        quality_display = self.quality_var.get()
+        quality = self.fetched_qualities.get(quality_display, "best")
         audio_format = AUDIO_FORMATS[self.audio_format_var.get()]
 
         self.progress_var.set(0)
         self.status_var.set("Starting download...")
         self.download_button.configure(state="disabled")
+        self.fetch_button.configure(state="disabled")
+        self.url_entry.configure(state="disabled")
         self.progress.configure(mode="indeterminate")
         self.progress.start(12)
 
@@ -485,6 +516,41 @@ class DownloaderApp(tk.Tk):
         elif state == "finished":
             self.events.put(("processing", "Processing downloaded file..."))
 
+    def _fetch_video_details(self) -> None:
+        if self.worker and self.worker.is_alive():
+            return
+
+        url = self.url_var.get().strip()
+        if not url:
+            messagebox.showwarning("Missing URL", "Paste a YouTube URL first.")
+            return
+
+        self.status_var.set("Fetching video details...")
+        self.download_button.configure(state="disabled")
+        self.fetch_button.configure(state="disabled")
+        self.url_entry.configure(state="disabled")
+        self.progress_var.set(0)
+        self.progress.configure(mode="indeterminate")
+        self.progress.start(12)
+
+        self.video_title_var.set("Loading video details...")
+        self.quality_combo.configure(values=["Fetching..."])
+        self.quality_var.set("Fetching...")
+
+        self.worker = threading.Thread(
+            target=self._fetch_worker,
+            args=(url,),
+            daemon=True,
+        )
+        self.worker.start()
+
+    def _fetch_worker(self, url: str) -> None:
+        try:
+            info = fetch_video_info(url)
+            self.events.put(("fetch_done", (url, info)))
+        except Exception as exc:
+            self.events.put(("fetch_error", str(exc)))
+
     def _poll_events(self) -> None:
         try:
             while True:
@@ -510,13 +576,70 @@ class DownloaderApp(tk.Tk):
                     self.progress_var.set(100)
                     self.status_var.set(f"Downloaded to {payload}")
                     self.download_button.configure(state="normal")
+                    self.fetch_button.configure(state="normal")
+                    self.url_entry.configure(state="normal")
                     messagebox.showinfo("Download complete", f"File saved to:\n{payload}")
                 elif kind == "error":
                     self.progress.stop()
                     self.progress.configure(mode="determinate")
                     self.download_button.configure(state="normal")
+                    self.fetch_button.configure(state="normal")
+                    self.url_entry.configure(state="normal")
                     self.status_var.set("Download failed.")
                     messagebox.showerror("Download failed", str(payload))
+                elif kind == "fetch_done":
+                    url, info = payload
+                    self.progress.stop()
+                    self.progress.configure(mode="determinate")
+                    self.progress_var.set(100)
+
+                    self.fetched_url = url
+                    title = info.get("title", "Unknown Title")
+                    heights = info.get("heights", [])
+
+                    self.video_title_var.set(title)
+
+                    self.fetched_qualities = {}
+                    if heights:
+                        combo_values = []
+                        for h in heights:
+                            display_str = f"{h}p"
+                            self.fetched_qualities[display_str] = str(h)
+                            combo_values.append(display_str)
+
+                        self.fetched_qualities["Best available"] = "best"
+                        self.fetched_qualities["Smallest file"] = "small"
+                        combo_values.insert(0, "Best available")
+                        combo_values.append("Smallest file")
+
+                        self.quality_combo.configure(values=combo_values)
+                        self.quality_var.set(combo_values[0])
+                    else:
+                        self.fetched_qualities = {
+                            "Best available": "best",
+                            "Smallest file": "small"
+                        }
+                        self.quality_combo.configure(values=["Best available", "Smallest file"])
+                        self.quality_var.set("Best available")
+
+                    self.status_var.set("Loaded video details successfully.")
+                    self.download_button.configure(state="normal")
+                    self.fetch_button.configure(state="normal")
+                    self.url_entry.configure(state="normal")
+                elif kind == "fetch_error":
+                    self.progress.stop()
+                    self.progress.configure(mode="determinate")
+                    self.progress_var.set(0)
+
+                    self.video_title_var.set("")
+                    self.quality_combo.configure(values=["Fetch info first"])
+                    self.quality_var.set("Fetch info first")
+
+                    self.download_button.configure(state="normal")
+                    self.fetch_button.configure(state="normal")
+                    self.url_entry.configure(state="normal")
+                    self.status_var.set("Failed to load video details.")
+                    messagebox.showerror("Error", f"Failed to fetch video details:\n{payload}")
         except queue.Empty:
             pass
         self.after(120, self._poll_events)

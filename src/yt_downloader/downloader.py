@@ -64,7 +64,12 @@ def build_options(
         return options
 
     if not ffmpeg_available:
-        options["format"] = "best[ext=mp4]/best"
+        if quality == "best":
+            options["format"] = "best[ext=mp4]/best"
+        elif quality == "small":
+            options["format"] = "worst[ext=mp4]/worst"
+        else:
+            options["format"] = f"best[height<={quality}][ext=mp4]/best[height<={quality}]/best"
         return options
 
     if quality == "best":
@@ -76,6 +81,52 @@ def build_options(
 
     options["merge_output_format"] = "mp4"
     return options
+
+
+def fetch_video_info(url: str) -> dict:
+    yt_dlp = require_ytdlp()
+    ffmpeg_available = get_ffmpeg_location() is not None
+
+    options = {
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": True,
+    }
+
+    with yt_dlp.YoutubeDL(options) as ydl:
+        try:
+            info = ydl.extract_info(url, download=False)
+        except Exception as exc:
+            raise DownloaderError(str(exc)) from exc
+
+        if info.get("_type") == "playlist":
+            entries = info.get("entries", [])
+            if not entries:
+                raise DownloaderError("The playlist is empty.")
+            info = entries[0]
+            if not info:
+                raise DownloaderError("Failed to extract details from the first playlist item.")
+
+        formats = info.get("formats", [])
+        heights = set()
+        for f in formats:
+            vcodec = f.get("vcodec")
+            acodec = f.get("acodec")
+            height = f.get("height")
+
+            if vcodec != "none" and vcodec is not None and height:
+                if ffmpeg_available:
+                    heights.add(height)
+                else:
+                    if acodec != "none" and acodec is not None:
+                        heights.add(height)
+
+        sorted_heights = sorted(list(heights), reverse=True)
+        return {
+            "title": info.get("title", "Unknown Title"),
+            "heights": sorted_heights,
+        }
+
 
 
 def download(
