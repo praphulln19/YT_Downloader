@@ -44,17 +44,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      - name: Download and Bundle FFmpeg
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path "vendor/ffmpeg/bin"
-          Invoke-WebRequest -Uri "https://github.com/ffbinaries/ffbinaries-prebuilt/releases/download/v6.1/ffmpeg-6.1-win-64.zip" -OutFile "ffmpeg.zip"
-          Invoke-WebRequest -Uri "https://github.com/ffbinaries/ffbinaries-prebuilt/releases/download/v6.1/ffprobe-6.1-win-64.zip" -OutFile "ffprobe.zip"
-          Expand-Archive -Path "ffmpeg.zip" -DestinationPath "vendor/ffmpeg/bin" -Force
-          Expand-Archive -Path "ffprobe.zip" -DestinationPath "vendor/ffmpeg/bin" -Force
-          Remove-Item "ffmpeg.zip"
-          Remove-Item "ffprobe.zip"
-
       - name: Build React and Package Electron
         run: |
           npm run build

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from shutil import which
 import subprocess
@@ -67,6 +68,10 @@ def build_options(
         "progress_hooks": progress_hooks,
     }
     if ffmpeg_location is not None:
+        ffmpeg_dir = str(ffmpeg_location.parent if ffmpeg_location.is_file() else ffmpeg_location)
+        current_path = os.environ.get("PATH", "")
+        if ffmpeg_dir not in current_path:
+            os.environ["PATH"] = ffmpeg_dir + os.pathsep + current_path
         options["ffmpeg_location"] = str(ffmpeg_location)
 
     if media_type == "audio":
@@ -107,7 +112,6 @@ def fetch_video_info(url: str) -> dict:
     ytdlp_obj = require_ytdlp()
     ffmpeg_available = ensure_ffmpeg() is not None
 
-    # Handle if yt-dlp is imported module or standalone path string
     if hasattr(ytdlp_obj, "YoutubeDL"):
         options = {
             "noplaylist": True,
@@ -148,7 +152,6 @@ def fetch_video_info(url: str) -> dict:
                 "heights": sorted_heights,
             }
     else:
-        # Fallback using ytdlp_exe path string
         import json
         cmd = [str(ytdlp_obj), "-J", "--no-playlist", url]
         res = subprocess.run(cmd, capture_output=True, text=True)
@@ -189,7 +192,6 @@ def download(
         except Exception as exc:
             raise DownloaderError(str(exc)) from exc
     else:
-        # Executable fallback
         fmt = options.get("format", "best")
         cmd = [str(ytdlp_obj), "-f", fmt, "-o", str(output_dir / "%(title).180s [%(id)s].%(ext)s"), url]
         if "ffmpeg_location" in options:
@@ -211,9 +213,12 @@ def has_ffmpeg() -> bool:
 def get_ffmpeg_location() -> Path | None:
     bundled = _bundled_ffmpeg_dir()
     if bundled is not None:
+        exe_file = bundled / "ffmpeg.exe"
+        if exe_file.exists():
+            return exe_file
         return bundled
     if which("ffmpeg") is not None:
-        return Path(which("ffmpeg")).parent
+        return Path(which("ffmpeg"))
     return None
 
 
@@ -223,7 +228,11 @@ def _bundled_ffmpeg_dir() -> Path | None:
     cwd = Path.cwd()
     python_dir = Path(sys.executable).parent
 
+    appdata = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+    user_appdata_ffmpeg = Path(appdata) / "YTDownloader" / "bin"
+
     candidates = [
+        user_appdata_ffmpeg,
         base / "vendor" / "ffmpeg" / "bin",
         base / "vendor" / "ffmpeg",
         base / "ffmpeg" / "bin",
@@ -253,7 +262,8 @@ def ensure_ffmpeg() -> Path | None:
             import urllib.request
             import zipfile
 
-            target_dir = ROOT / "vendor" / "ffmpeg" / "bin"
+            appdata = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+            target_dir = Path(appdata) / "YTDownloader" / "bin"
             target_dir.mkdir(parents=True, exist_ok=True)
             zip_path = target_dir / "ffmpeg.zip"
 
@@ -266,6 +276,9 @@ def ensure_ffmpeg() -> Path | None:
             if zip_path.exists():
                 zip_path.unlink()
 
+            exe_path = target_dir / "ffmpeg.exe"
+            if exe_path.exists():
+                return exe_path
             return get_ffmpeg_location()
         except Exception:
             return None
@@ -273,7 +286,8 @@ def ensure_ffmpeg() -> Path | None:
 
 
 def ensure_ytdlp_exe() -> Path | None:
-    target_dir = ROOT / "vendor" / "ffmpeg" / "bin"
+    appdata = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+    target_dir = Path(appdata) / "YTDownloader" / "bin"
     exe_path = target_dir / "yt-dlp.exe"
     if exe_path.exists():
         return exe_path
