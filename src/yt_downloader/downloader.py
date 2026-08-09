@@ -5,6 +5,8 @@ from shutil import which
 import sys
 from typing import Callable
 
+# Root directory helper
+ROOT = Path(__file__).resolve().parents[2]
 
 class DownloaderError(RuntimeError):
     pass
@@ -32,7 +34,7 @@ def build_options(
     progress_hook: ProgressHook | None = None,
 ) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
-    ffmpeg_location = get_ffmpeg_location()
+    ffmpeg_location = ensure_ffmpeg()
     ffmpeg_available = ffmpeg_location is not None
     progress_hooks = [_progress]
     if progress_hook is not None:
@@ -77,7 +79,7 @@ def build_options(
     elif quality == "small":
         options["format"] = "worstvideo*+worstaudio/worst"
     else:
-        options["format"] = f"bv*[height<={quality}]+ba/b[height<={quality}]/best"
+        options["format"] = f"bv*[height={quality}]+ba/bv*[height<={quality}]+ba/b[height<={quality}]/best"
 
     options["merge_output_format"] = "mp4"
     return options
@@ -85,7 +87,7 @@ def build_options(
 
 def fetch_video_info(url: str) -> dict:
     yt_dlp = require_ytdlp()
-    ffmpeg_available = get_ffmpeg_location() is not None
+    ffmpeg_available = ensure_ffmpeg() is not None
 
     options = {
         "noplaylist": True,
@@ -128,7 +130,6 @@ def fetch_video_info(url: str) -> dict:
         }
 
 
-
 def download(
     url: str,
     media_type: str,
@@ -152,25 +153,68 @@ def _progress(status: dict) -> None:
 
 
 def has_ffmpeg() -> bool:
-    return get_ffmpeg_location() is not None
+    return ensure_ffmpeg() is not None
 
 
 def get_ffmpeg_location() -> Path | None:
     bundled = _bundled_ffmpeg_dir()
     if bundled is not None:
         return bundled
-    if which("ffmpeg") is not None and which("ffprobe") is not None:
+    if which("ffmpeg") is not None:
         return Path(which("ffmpeg")).parent
     return None
 
 
 def _bundled_ffmpeg_dir() -> Path | None:
-    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
+    file_dir = Path(__file__).resolve().parent
+    base = Path(getattr(sys, "_MEIPASS", file_dir.parents[2]))
+    cwd = Path.cwd()
+    python_dir = Path(sys.executable).parent
+
     candidates = [
-        base / "ffmpeg",
         base / "vendor" / "ffmpeg" / "bin",
+        base / "vendor" / "ffmpeg",
+        base / "ffmpeg" / "bin",
+        base / "ffmpeg",
+        base,
+        cwd / "vendor" / "ffmpeg" / "bin",
+        cwd / "vendor" / "ffmpeg",
+        cwd / "ffmpeg",
+        cwd,
+        file_dir.parents[1] / "vendor" / "ffmpeg" / "bin",
+        python_dir / "ffmpeg",
+        python_dir / "Scripts",
     ]
     for candidate in candidates:
-        if (candidate / "ffmpeg.exe").exists() and (candidate / "ffprobe.exe").exists():
+        if (candidate / "ffmpeg.exe").exists() or (candidate / "ffmpeg").exists():
             return candidate
+    return None
+
+
+def ensure_ffmpeg() -> Path | None:
+    loc = get_ffmpeg_location()
+    if loc is not None:
+        return loc
+
+    if sys.platform == "win32":
+        try:
+            import urllib.request
+            import zipfile
+
+            target_dir = ROOT / "vendor" / "ffmpeg" / "bin"
+            target_dir.mkdir(parents=True, exist_ok=True)
+            zip_path = target_dir / "ffmpeg.zip"
+
+            url = "https://github.com/ffbinaries/ffbinaries-prebuilt/releases/download/v6.1/ffmpeg-6.1-win-64.zip"
+            urllib.request.urlretrieve(url, zip_path)
+
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall(target_dir)
+
+            if zip_path.exists():
+                zip_path.unlink()
+
+            return get_ffmpeg_location()
+        except Exception:
+            return None
     return None
