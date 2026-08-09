@@ -49,3 +49,8 @@ vendor/ffmpeg/bin/*.exe
 vendor/ffmpeg/bin/*.dll
 vendor/ffmpeg/bin/*.txt
 !vendor/ffmpeg/bin/.gitkeep
+
+# Node.js and build outputs
+node_modules/
+dist-react/
+dist-electron/
