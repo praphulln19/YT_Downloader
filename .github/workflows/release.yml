@@ -43,8 +43,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "vendor/ffmpeg/bin"
-          Invoke-WebRequest -Uri "https://node.ffbinaries.com/bin/windows-64/ffmpeg.zip" -OutFile "ffmpeg.zip"
-          Invoke-WebRequest -Uri "https://node.ffbinaries.com/bin/windows-64/ffprobe.zip" -OutFile "ffprobe.zip"
+          Invoke-WebRequest -Uri "https://github.com/ffbinaries/ffbinaries-prebuilt/releases/download/v6.1/ffmpeg-6.1-win-64.zip" -OutFile "ffmpeg.zip"
+          Invoke-WebRequest -Uri "https://github.com/ffbinaries/ffbinaries-prebuilt/releases/download/v6.1/ffprobe-6.1-win-64.zip" -OutFile "ffprobe.zip"
           Expand-Archive -Path "ffmpeg.zip" -DestinationPath "vendor/ffmpeg/bin" -Force
           Expand-Archive -Path "ffprobe.zip" -DestinationPath "vendor/ffmpeg/bin" -Force
           Remove-Item "ffmpeg.zip"
