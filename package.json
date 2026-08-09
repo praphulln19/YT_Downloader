@@ -40,7 +40,8 @@
       "vendor/ffmpeg/bin/**"
     ],
     "win": {
-      "target": "dir"
+      "target": "portable",
+      "artifactName": "YT-Downloader-${version}.exe"
     }
   }
 }

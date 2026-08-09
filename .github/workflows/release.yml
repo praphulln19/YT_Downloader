@@ -70,18 +70,13 @@ jobs:
             echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Zip Build Output
-        shell: pwsh
-        run: |
-          Compress-Archive -Path "dist-electron/win-unpacked" -DestinationPath "dist-electron/YT-Downloader-${{ steps.get_tag.outputs.tag }}.zip"
-
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          gh release create "${{ steps.get_tag.outputs.tag }}" "dist-electron/YT-Downloader-${{ steps.get_tag.outputs.tag }}.zip" \
+          gh release create "${{ steps.get_tag.outputs.tag }}" dist-electron/*.exe \
             --title "Release ${{ steps.get_tag.outputs.tag }}" \
             --generate-notes || \
-          gh release upload "${{ steps.get_tag.outputs.tag }}" "dist-electron/YT-Downloader-${{ steps.get_tag.outputs.tag }}.zip" \
+          gh release upload "${{ steps.get_tag.outputs.tag }}" dist-electron/*.exe \
             --clobber
