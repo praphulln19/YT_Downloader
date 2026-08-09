@@ -19,16 +19,32 @@ ProgressHook = Callable[[dict], None]
 
 
 def require_ytdlp():
+    # Always try to upgrade yt-dlp first (silently) — YouTube changes formats
+    # frequently and outdated yt-dlp versions return only 360p streams
     try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--upgrade", "--quiet", "yt-dlp"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=30,
+        )
+    except Exception:
+        pass
+
+    try:
+        # Reload module in case it was just upgraded
+        if "yt_dlp" in sys.modules:
+            del sys.modules["yt_dlp"]
         import yt_dlp
         return yt_dlp
     except ImportError:
-        # Fallback 1: Silent pip install
+        # Fallback 1: Full pip install with dependencies
         try:
             subprocess.check_call(
                 [sys.executable, "-m", "pip", "install", "--quiet", "yt-dlp", "requests", "certifi"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                timeout=60,
             )
             import yt_dlp
             return yt_dlp
