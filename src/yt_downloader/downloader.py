@@ -259,7 +259,6 @@ def ensure_ffmpeg() -> Path | None:
 
     if sys.platform == "win32":
         try:
-            import urllib.request
             import zipfile
 
             appdata = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
@@ -268,7 +267,18 @@ def ensure_ffmpeg() -> Path | None:
             zip_path = target_dir / "ffmpeg.zip"
 
             url = "https://github.com/ffbinaries/ffbinaries-prebuilt/releases/download/v6.1/ffmpeg-6.1-win-64.zip"
-            urllib.request.urlretrieve(url, zip_path)
+
+            # Use curl.exe (built into Windows 10+) — handles SSL and redirects properly
+            result = subprocess.run(
+                ["curl.exe", "-L", "-o", str(zip_path), url],
+                capture_output=True,
+                timeout=120,
+            )
+            if result.returncode != 0 or not zip_path.exists() or zip_path.stat().st_size < 1000:
+                print(f"[YTD] FFmpeg download failed: curl exit {result.returncode}", file=sys.stderr, flush=True)
+                if zip_path.exists():
+                    zip_path.unlink()
+                return None
 
             with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 zip_ref.extractall(target_dir)
@@ -278,9 +288,11 @@ def ensure_ffmpeg() -> Path | None:
 
             exe_path = target_dir / "ffmpeg.exe"
             if exe_path.exists():
+                print(f"[YTD] FFmpeg installed to {exe_path}", file=sys.stderr, flush=True)
                 return exe_path
             return get_ffmpeg_location()
-        except Exception:
+        except Exception as exc:
+            print(f"[YTD] FFmpeg auto-install error: {exc}", file=sys.stderr, flush=True)
             return None
     return None
 
@@ -294,12 +306,18 @@ def ensure_ytdlp_exe() -> Path | None:
         
     if sys.platform == "win32":
         try:
-            import urllib.request
             target_dir.mkdir(parents=True, exist_ok=True)
             url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-            urllib.request.urlretrieve(url, exe_path)
-            if exe_path.exists():
+            result = subprocess.run(
+                ["curl.exe", "-L", "-o", str(exe_path), url],
+                capture_output=True,
+                timeout=120,
+            )
+            if result.returncode == 0 and exe_path.exists() and exe_path.stat().st_size > 1000:
+                print(f"[YTD] yt-dlp installed to {exe_path}", file=sys.stderr, flush=True)
                 return exe_path
-        except Exception:
-            return None
+            print(f"[YTD] yt-dlp download failed: curl exit {result.returncode}", file=sys.stderr, flush=True)
+        except Exception as exc:
+            print(f"[YTD] yt-dlp auto-install error: {exc}", file=sys.stderr, flush=True)
     return None
+

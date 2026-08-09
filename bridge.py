@@ -8,14 +8,19 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from yt_downloader.downloader import download, fetch_video_info, DownloaderError
+from yt_downloader.downloader import download, fetch_video_info, has_ffmpeg, DownloaderError
 
 def main():
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 2:
         print(json.dumps({"error": "Invalid arguments"}), flush=True)
         sys.exit(1)
 
     command = sys.argv[1]
+
+    if command == "check-ffmpeg":
+        available = has_ffmpeg()
+        print(json.dumps({"available": available}), flush=True)
+        return
     
     if command == "info":
         url = sys.argv[2]

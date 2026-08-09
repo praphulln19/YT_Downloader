@@ -56,12 +56,23 @@ ipcMain.handle('get-default-download-dir', () => {
 })
 
 ipcMain.handle('has-ffmpeg', async () => {
-  return new Promise((resolve) => {
-    exec('python -c "import sys; sys.path.insert(0, \'src\'); from yt_downloader.downloader import has_ffmpeg; print(has_ffmpeg())"', { cwd: __dirname }, (err, stdout) => {
-      if (err) return resolve(false)
-      resolve(stdout.trim() === 'True')
+  const bridgeScript = path.join(__dirname, 'bridge.py')
+  const tryCmd = (cmd) => new Promise((resolve) => {
+    exec(`${cmd} "${bridgeScript}" check-ffmpeg`, { cwd: __dirname, timeout: 130000 }, (err, stdout) => {
+      if (err) return resolve(null)
+      try {
+        const parsed = JSON.parse(stdout.trim())
+        resolve(parsed.available === true)
+      } catch {
+        resolve(null)
+      }
     })
   })
+  // Try 'python' first, then 'py' (Windows Python Launcher)
+  const result = await tryCmd(pythonCmd)
+  if (result !== null) return result
+  const fallback = await tryCmd('py')
+  return fallback === true
 })
 
 ipcMain.handle('fetch-info', async (event, url) => {
