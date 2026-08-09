@@ -5,11 +5,5 @@
 
 !macro customInstall
   DetailPrint "Installing YT Downloader..."
-  DetailPrint "Creating application directory..."
-  DetailPrint "Extracting files..."
-!macroend
-
-!macro customInstallMode
-  ; Force non-silent mode so user always sees the install progress
-  StrCpy $isForceRunAsAdmin "true"
+  DetailPrint "Setting up application files..."
 !macroend
