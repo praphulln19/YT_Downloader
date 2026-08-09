@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from shutil import which
+import subprocess
 import sys
 from typing import Callable
 
@@ -19,11 +20,28 @@ ProgressHook = Callable[[dict], None]
 def require_ytdlp():
     try:
         import yt_dlp
-    except ImportError as exc:
+        return yt_dlp
+    except ImportError:
+        # Fallback 1: Silent pip install
+        try:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "--quiet", "yt-dlp", "requests", "certifi"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            import yt_dlp
+            return yt_dlp
+        except Exception:
+            pass
+
+        # Fallback 2: Standalone yt-dlp.exe check / auto-download
+        exe_loc = ensure_ytdlp_exe()
+        if exe_loc is not None:
+            return exe_loc
+
         raise DownloaderError(
-            "yt-dlp is not installed. Run: python -m pip install -r requirements.txt"
-        ) from exc
-    return yt_dlp
+            "yt-dlp could not be initialized automatically. Please run: pip install yt-dlp"
+        )
 
 
 def build_options(
@@ -86,43 +104,66 @@ def build_options(
 
 
 def fetch_video_info(url: str) -> dict:
-    yt_dlp = require_ytdlp()
+    ytdlp_obj = require_ytdlp()
     ffmpeg_available = ensure_ffmpeg() is not None
 
-    options = {
-        "noplaylist": True,
-        "quiet": True,
-        "no_warnings": True,
-    }
+    # Handle if yt-dlp is imported module or standalone path string
+    if hasattr(ytdlp_obj, "YoutubeDL"):
+        options = {
+            "noplaylist": True,
+            "quiet": True,
+            "no_warnings": True,
+        }
+        with ytdlp_obj.YoutubeDL(options) as ydl:
+            try:
+                info = ydl.extract_info(url, download=False)
+            except Exception as exc:
+                raise DownloaderError(str(exc)) from exc
 
-    with yt_dlp.YoutubeDL(options) as ydl:
-        try:
-            info = ydl.extract_info(url, download=False)
-        except Exception as exc:
-            raise DownloaderError(str(exc)) from exc
+            if info.get("_type") == "playlist":
+                entries = info.get("entries", [])
+                if not entries:
+                    raise DownloaderError("The playlist is empty.")
+                info = entries[0]
+                if not info:
+                    raise DownloaderError("Failed to extract details from the first playlist item.")
 
-        if info.get("_type") == "playlist":
-            entries = info.get("entries", [])
-            if not entries:
-                raise DownloaderError("The playlist is empty.")
-            info = entries[0]
-            if not info:
-                raise DownloaderError("Failed to extract details from the first playlist item.")
+            formats = info.get("formats", [])
+            heights = set()
+            for f in formats:
+                vcodec = f.get("vcodec")
+                acodec = f.get("acodec")
+                height = f.get("height")
 
+                if vcodec != "none" and vcodec is not None and height:
+                    if ffmpeg_available:
+                        heights.add(height)
+                    else:
+                        if acodec != "none" and acodec is not None:
+                            heights.add(height)
+
+            sorted_heights = sorted(list(heights), reverse=True)
+            return {
+                "title": info.get("title", "Unknown Title"),
+                "heights": sorted_heights,
+            }
+    else:
+        # Fallback using ytdlp_exe path string
+        import json
+        cmd = [str(ytdlp_obj), "-J", "--no-playlist", url]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode != 0:
+            raise DownloaderError(res.stderr.strip() or "Failed to extract video details")
+        info = json.loads(res.stdout)
         formats = info.get("formats", [])
         heights = set()
         for f in formats:
             vcodec = f.get("vcodec")
             acodec = f.get("acodec")
             height = f.get("height")
-
             if vcodec != "none" and vcodec is not None and height:
-                if ffmpeg_available:
+                if ffmpeg_available or (acodec != "none" and acodec is not None):
                     heights.add(height)
-                else:
-                    if acodec != "none" and acodec is not None:
-                        heights.add(height)
-
         sorted_heights = sorted(list(heights), reverse=True)
         return {
             "title": info.get("title", "Unknown Title"),
@@ -138,13 +179,24 @@ def download(
     output_dir: Path,
     progress_hook: ProgressHook | None = None,
 ) -> None:
-    yt_dlp = require_ytdlp()
+    ytdlp_obj = require_ytdlp()
     options = build_options(media_type, quality, audio_format, output_dir, progress_hook)
-    try:
-        with yt_dlp.YoutubeDL(options) as ydl:
-            ydl.download([url])
-    except Exception as exc:
-        raise DownloaderError(str(exc)) from exc
+    
+    if hasattr(ytdlp_obj, "YoutubeDL"):
+        try:
+            with ytdlp_obj.YoutubeDL(options) as ydl:
+                ydl.download([url])
+        except Exception as exc:
+            raise DownloaderError(str(exc)) from exc
+    else:
+        # Executable fallback
+        fmt = options.get("format", "best")
+        cmd = [str(ytdlp_obj), "-f", fmt, "-o", str(output_dir / "%(title).180s [%(id)s].%(ext)s"), url]
+        if "ffmpeg_location" in options:
+            cmd.extend(["--ffmpeg-location", options["ffmpeg_location"]])
+        res = subprocess.run(cmd)
+        if res.returncode != 0:
+            raise DownloaderError("Download process failed.")
 
 
 def _progress(status: dict) -> None:
@@ -215,6 +267,25 @@ def ensure_ffmpeg() -> Path | None:
                 zip_path.unlink()
 
             return get_ffmpeg_location()
+        except Exception:
+            return None
+    return None
+
+
+def ensure_ytdlp_exe() -> Path | None:
+    target_dir = ROOT / "vendor" / "ffmpeg" / "bin"
+    exe_path = target_dir / "yt-dlp.exe"
+    if exe_path.exists():
+        return exe_path
+        
+    if sys.platform == "win32":
+        try:
+            import urllib.request
+            target_dir.mkdir(parents=True, exist_ok=True)
+            url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+            urllib.request.urlretrieve(url, exe_path)
+            if exe_path.exists():
+                return exe_path
         except Exception:
             return None
     return None
