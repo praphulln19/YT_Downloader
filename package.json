@@ -1,6 +1,6 @@
 {
   "name": "yt-downloader",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Windows YouTube Downloader built with Electron and React",
   "main": "main.js",
   "type": "commonjs",
@@ -9,7 +9,7 @@
     "build": "vite build",
     "electron": "electron .",
     "electron:dev": "electron . --dev",
-    "package": "electron-builder"
+    "package": "electron-builder --publish never"
   },
   "keywords": [],
   "author": "",
