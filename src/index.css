@@ -60,7 +60,7 @@ header {
   justify-content: space-between;
   align-items: center;
   padding-bottom: 24px;
-  border-b: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .logo-container {
@@ -72,15 +72,7 @@ header {
 .logo-badge {
   width: 36px;
   height: 36px;
-  background: var(--accent-black);
-  color: #ffffff;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-mono);
-  font-size: 16px;
-  font-weight: 600;
+  flex-shrink: 0;
 }
 
 h1 {
@@ -399,7 +391,7 @@ h1 {
 
 .terminal-header {
   display: flex;
-  items-center: center;
+  align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
   border-bottom: 1px solid var(--border-light);
@@ -470,7 +462,7 @@ h1 {
 footer {
   margin-top: auto;
   padding-top: 32px;
-  border-t: 1px solid var(--border-light);
+  border-top: 1px solid var(--border-light);
   display: flex;
   justify-content: space-between;
   font-size: 12px;

@@ -125,7 +125,13 @@ export default function App() {
     <div className="app-container">
       <header>
         <div className="logo-container">
-          <div className="logo-badge">↓</div>
+          <svg className="logo-badge" viewBox="0 0 100 100" aria-label="YT Downloader logo">
+            <rect width="100" height="100" rx="22" fill="#111111" />
+            <g transform="translate(28,28) scale(2.3333)" fill="#ffffff">
+              <polygon points="6,4 18,4 12,14" />
+              <rect x="6" y="17.6" width="12" height="2.4" rx="1.2" />
+            </g>
+          </svg>
           <div>
             <h1>YT Downloader</h1>
             <p className="subtitle">Standalone Media Engine</p>
@@ -353,7 +359,7 @@ export default function App() {
       </main>
 
       <footer>
-        <span>YT Downloader v1.0.3</span>
+        <span>YT Downloader v1.0.9</span>
         <span>Built with Electron & React</span>
       </footer>
     </div>
