@@ -6,8 +6,8 @@
 
 **Download YouTube videos and audio to your desktop — with a single click.**
 
-[![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/praphulln19/YT_Downloader/releases)
-[![Version](https://img.shields.io/badge/Version-1.0.9-blue?style=for-the-badge)](https://github.com/praphulln19/YT_Downloader/releases)
+[![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/gloooomed/YT_Downloader/releases)
+[![Version](https://img.shields.io/badge/Version-1.0.9-blue?style=for-the-badge)](https://github.com/gloooomed/YT_Downloader/releases)
 [![Electron](https://img.shields.io/badge/Built%20with-Electron-47848F?style=for-the-badge&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![yt--dlp](https://img.shields.io/badge/Powered%20by-yt--dlp-FF0000?style=for-the-badge)](https://github.com/yt-dlp/yt-dlp)
 
@@ -41,7 +41,7 @@
 
 ### Option 1 — Windows Installer *(Recommended)*
 
-1. Download the latest installer from [GitHub Releases](https://github.com/praphulln19/YT_Downloader/releases)
+1. Download the latest installer from [GitHub Releases](https://github.com/gloooomed/YT_Downloader/releases)
 2. Run `YT-Downloader-Setup-<version>.exe` and follow the setup wizard
 3. Launch **YT Downloader** from the Start Menu or desktop shortcut
 
@@ -53,7 +53,7 @@
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/praphulln19/YT_Downloader.git
+   git clone https://github.com/gloooomed/YT_Downloader.git
    cd YT_Downloader
    ```
 
@@ -158,7 +158,7 @@ YT_Downloader/
 Contributions are welcome. To get started:
 
 ```bash
-git clone https://github.com/praphulln19/YT_Downloader.git
+git clone https://github.com/gloooomed/YT_Downloader.git
 cd YT_Downloader
 ```
 
@@ -167,7 +167,7 @@ cd YT_Downloader
 3. Verify both the desktop app (`npm run electron:dev`) and the standalone CLI (`ytd`) still work
 4. Submit a pull request with a clear description of what changed and why
 
-For bug reports or feature requests, please [open an issue](https://github.com/praphulln19/YT_Downloader/issues).
+For bug reports or feature requests, please [open an issue](https://github.com/gloooomed/YT_Downloader/issues).
 
 ---
 
@@ -206,6 +206,6 @@ For bug reports or feature requests, please [open an issue](https://github.com/p
 
 Made for anyone who wants their videos, not just a streaming link.
 
-If this project is useful to you, consider giving it a star on [GitHub](https://github.com/praphulln19/YT_Downloader).
+If this project is useful to you, consider giving it a star on [GitHub](https://github.com/gloooomed/YT_Downloader).
 
 </div>
